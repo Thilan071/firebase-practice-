@@ -45,11 +45,13 @@ dependencies:
   
   # Navigation
   go_router: ^14.0.1
-  
-  # Authentication
+    # Authentication
   firebase_core: ^2.27.2
   firebase_auth: ^4.18.0
   google_sign_in: ^6.2.1
+  
+  # Analytics
+  firebase_analytics: ^10.8.10
 
 dev_dependencies:
   flutter_test:
