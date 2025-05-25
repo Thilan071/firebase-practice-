@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
+import '../services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -27,12 +29,20 @@ class _SplashScreenState extends State<SplashScreen>
         curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
       ),
     );
-
     _animationController.forward();
 
-    // Navigate to login screen after splash animation
+    // Check if user is already logged in
+    final AuthService _authService = AuthService();
+
+    // Navigate to appropriate screen based on auth state after splash animation
     Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pushReplacementNamed(context, '/login');
+      if (_authService.currentUser != null) {
+        // User is already logged in
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // User needs to log in
+        Navigator.pushReplacementNamed(context, '/login');
+      }
     });
   }
 

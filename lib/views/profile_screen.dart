@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -9,13 +11,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Mock user data
-  final Map<String, dynamic> _userData = {
-    'name': 'Alex Johnson',
-    'email': 'alex.johnson@example.com',
-    'photoUrl':
-        'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80',
-    'statusMessage': 'Computer Science Student | Tech Enthusiast',
+  final AuthService _authService = AuthService();
+  late User? _currentUser;
+  bool _isLoading = true;
+
+  // This will hold additional user data that might come from Firestore later
+  Map<String, dynamic> _additionalUserData = {
+    'statusMessage': 'CampusConnect User',
     'groups': [
       {
         'id': '1',
@@ -38,11 +40,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ],
     'stats': {'eventsCreated': 5, 'eventAttended': 12, 'messagesSent': 178},
   };
-
   bool _isDarkMode = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    _currentUser = _authService.currentUser;
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_currentUser == null) {
+      // If user is not logged in, redirect to login page
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
+      });
+      return const Scaffold(
+        body: Center(child: Text('Redirecting to login...')),
+      );
+    }
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -69,11 +101,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 48,
-                          backgroundImage: NetworkImage(_userData['photoUrl']),
+                          backgroundImage:
+                              _currentUser?.photoURL != null
+                                  ? NetworkImage(_currentUser!.photoURL!)
+                                  : null,
+                          child:
+                              _currentUser?.photoURL == null
+                                  ? const Icon(
+                                    Icons.person,
+                                    size: 48,
+                                    color: Colors.white,
+                                  )
+                                  : null,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _userData['name'],
+                          _currentUser?.displayName ??
+                              _currentUser?.email?.split('@')[0] ??
+                              'User',
                           style: Theme.of(
                             context,
                           ).textTheme.headlineMedium?.copyWith(
@@ -82,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         Text(
-                          _userData['statusMessage'],
+                          _currentUser?.email ?? '',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: Colors.white70),
                         ),
@@ -115,9 +160,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   scrollDirection: Axis.horizontal,
-                  itemCount: _userData['groups'].length,
+                  itemCount: _additionalUserData['groups'].length,
                   itemBuilder: (context, index) {
-                    final group = _userData['groups'][index];
+                    final group = _additionalUserData['groups'][index];
                     return Container(
                       width: 100,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -160,19 +205,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildStatCard(
                     context,
                     'Events Created',
-                    _userData['stats']['eventsCreated'].toString(),
+                    _additionalUserData['stats']['eventsCreated'].toString(),
                     Icons.event,
                   ),
                   _buildStatCard(
                     context,
                     'Events Attended',
-                    _userData['stats']['eventAttended'].toString(),
+                    _additionalUserData['stats']['eventAttended'].toString(),
                     Icons.event_available,
                   ),
                   _buildStatCard(
                     context,
                     'Messages Sent',
-                    _userData['stats']['messagesSent'].toString(),
+                    _additionalUserData['stats']['messagesSent'].toString(),
                     Icons.message,
                   ),
                 ],
@@ -234,15 +279,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // TODO: Show about dialog
                 },
               ),
-
               const SizedBox(height: 16),
               // Logout button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Implement logout logic
-                    Navigator.pushReplacementNamed(context, '/login');
+                  onPressed: () async {
+                    try {
+                      await _authService.signOut();
+                      if (!mounted) return;
+                      Navigator.pushReplacementNamed(context, '/login');
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error signing out: ${e.toString()}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red[600],

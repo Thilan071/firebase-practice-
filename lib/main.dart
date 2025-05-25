@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'theme/app_theme.dart';
 import 'views/splash_screen.dart';
 import 'views/login_screen.dart';
+import 'views/signup_screen.dart';
 import 'widgets/main_navigation_screen.dart';
 
 Future<void> main() async {
@@ -24,6 +25,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
+        '/signup': (context) => const SignupScreen(),
         '/home': (context) => const MainNavigationScreen(),
       },
     );

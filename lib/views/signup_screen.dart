@@ -1,47 +1,66 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final AuthService _authService = AuthService();
+
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _signup() async {
     if (_formKey.currentState?.validate() ?? false) {
+      if (_passwordController.text != _confirmPasswordController.text) {
+        setState(() {
+          _errorMessage = 'Passwords do not match';
+        });
+        return;
+      }
+
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
 
       try {
-        // Use the authentication service to sign in
-        await _authService.signInWithEmailPassword(
+        // Use the authentication service to sign up
+        await _authService.signUpWithEmailPassword(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        // If successful, navigate to home screen
+
+        // If successful, navigate back to login or directly to home
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/home');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully!')),
+        );
+
+        Navigator.pop(context); // Go back to login screen
       } on FirebaseAuthException catch (e) {
         // Handle specific Firebase auth errors
         setState(() {
@@ -64,18 +83,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _getMessageFromErrorCode(String errorCode) {
     switch (errorCode) {
+      case 'email-already-in-use':
+        return 'Email is already in use by another account.';
       case 'invalid-email':
         return 'The email address is badly formatted.';
-      case 'user-disabled':
-        return 'This user has been disabled.';
-      case 'user-not-found':
-        return 'No user found with this email.';
-      case 'wrong-password':
-        return 'Wrong password. Please try again.';
-      case 'too-many-requests':
-        return 'Too many login attempts. Try again later.';
       case 'operation-not-allowed':
-        return 'Email/password sign-in is not enabled.';
+        return 'Email/password accounts are not enabled.';
+      case 'weak-password':
+        return 'The password is too weak.';
       case 'network-request-failed':
         return 'Network error. Check your connection.';
       default:
@@ -86,6 +101,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Create an Account'),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -95,8 +115,8 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // App Logo
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
@@ -111,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Center(
                     child: Icon(
                       Icons.school,
-                      size: 50,
+                      size: 40,
                       color: AppTheme.primaryColor,
                     ),
                   ),
@@ -120,23 +140,38 @@ class _LoginScreenState extends State<LoginScreen> {
                 // App Name
                 Text(
                   'CampusConnect',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in to your account',
+                  'Create a new account',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 32),
-                // Login Form
+                // Signup Form
                 Form(
                   key: _formKey,
                   child: Column(
                     children: [
+                      // Name Input
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your name';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       // Email Input
                       TextFormField(
                         controller: _emailController,
@@ -178,10 +213,42 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
+                            return 'Please enter a password';
                           }
                           if (value.length < 6) {
                             return 'Password should be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      // Confirm Password Input
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirmPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please confirm your password';
+                          }
+                          if (value != _passwordController.text) {
+                            return 'Passwords do not match';
                           }
                           return null;
                         },
@@ -205,77 +272,32 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: const TextStyle(color: Colors.red),
                           ),
                         ),
-                      const SizedBox(height: 16), // Login Button
+                      const SizedBox(height: 24),
+                      // Sign Up Button
                       _isLoading
                           ? const CircularProgressIndicator()
                           : SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: _login,
-                              child: const Text('Log In'),
+                              onPressed: _signup,
+                              child: const Text('Sign Up'),
                             ),
                           ),
-                      const SizedBox(height: 16),
-                      // Social Sign-in Options
-                      Row(
-                        children: [
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                            ),
-                            child: Text(
-                              'Or sign in with',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: Colors.grey),
-                            ),
-                          ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Social Sign-in Buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Google Button
-                          _socialSignInButton(
-                            context,
-                            icon: Icons.g_mobiledata,
-                            onPressed: () {},
-                          ),
-                          const SizedBox(width: 16),
-                          // Apple Button
-                          _socialSignInButton(
-                            context,
-                            icon: Icons.apple,
-                            onPressed: () {},
-                          ),
-                        ],
-                      ),
                       const SizedBox(height: 24),
-                      // Guest Mode
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushReplacementNamed(context, '/home');
-                        },
-                        child: const Text('Continue as Guest'),
-                      ),
-                      const SizedBox(height: 16),
-                      // Sign Up Option
+                      // Login Option
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Don\'t have an account? ',
+                            'Already have an account? ',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                           TextButton(
                             onPressed: () {
-                              Navigator.pushNamed(context, '/signup');
+                              Navigator.pop(context);
                             },
-                            child: const Text('Sign Up'),
+                            child: const Text('Log In'),
                           ),
                         ],
                       ),
@@ -286,34 +308,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _socialSignInButton(
-    BuildContext context, {
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Icon(icon, color: AppTheme.primaryColor, size: 32),
       ),
     );
   }
