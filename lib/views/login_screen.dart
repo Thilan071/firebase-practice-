@@ -78,8 +78,45 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Email/password sign-in is not enabled.';
       case 'network-request-failed':
         return 'Network error. Check your connection.';
+      case 'google-sign-in-cancelled':
+        return 'Google sign-in was cancelled.';
+      case 'google-sign-in-failed':
+        return 'Google sign-in failed. Please try again.';
       default:
         return 'An error occurred. Please try again.';
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Use the authentication service to sign in with Google
+      await _authService.signInWithGoogle();
+
+      // If successful, navigate to home screen
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home');
+    } on FirebaseAuthException catch (e) {
+      // Handle Firebase auth errors
+      setState(() {
+        _errorMessage = _getMessageFromErrorCode(e.code);
+      });
+    } catch (e) {
+      // Handle other errors
+      setState(() {
+        _errorMessage =
+            'An error occurred during Google sign-in. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -242,8 +279,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           // Google Button
                           _socialSignInButton(
                             context,
-                            icon: Icons.g_mobiledata,
-                            onPressed: () {},
+                            icon:
+                                Icons
+                                    .gpp_maybe_rounded, // Using a Google-like icon
+                            onPressed: _signInWithGoogle,
                           ),
                           const SizedBox(width: 16),
                           // Apple Button
