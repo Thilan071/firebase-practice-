@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Groups collection - Allow read to everyone, write with authentication
+    match /groups/{groupId} {
+      // Anyone can read groups
+      allow read: if true;
+      
+      // Only authenticated users can update groups
+      allow update: if request.auth != null;
+      
+      // Only authenticated users can create groups
+      allow create: if request.auth != null;
+      
+      // Only authenticated users who are members or admins can delete
+      allow delete: if request.auth != null && 
+        (request.auth.uid in resource.data.members || 
+         request.auth.uid in get(/databases/$(database)/documents/users/admins).data.adminIds);
+    }
+    
+    // Users collection - More restricted access
+    match /users/{userId} {
+      // Allow users to read all profiles
+      allow read: if true;
+      
+      // Allow users to only write their own profile
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Default rule - deny access to all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
